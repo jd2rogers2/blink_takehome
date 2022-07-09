@@ -10,12 +10,32 @@ import MenuList from '@mui/material/MenuList';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
 import Paper from '@mui/material/Paper';
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+
+const sanitizeDrugName = (drugName: string): string => {
+  return drugName;
+};
+
+const getPageTitle = (pathname: string, drugName?: string): string => {
+  if (pathname.includes('/drugs/search')) {
+    return 'Search';
+  }
+
+  if (drugName) {
+    return sanitizeDrugName(drugName);
+  }
+
+  return '';
+}
 
 function Header() {
   const [open, setOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { drugName } = useParams();
+
+  const pageTitle = getPageTitle(pathname, drugName);
 
   const handleToggle = () => {
     setOpen((prevOpen) => !prevOpen);
@@ -61,6 +81,9 @@ function Header() {
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Blink Takehome
+        </Typography>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          {pageTitle}
         </Typography>
         <IconButton
           size="large"
@@ -108,7 +131,6 @@ function Header() {
             </Grow>
           )}
         </Popper>
-
       </Toolbar>
     </AppBar>
   );
