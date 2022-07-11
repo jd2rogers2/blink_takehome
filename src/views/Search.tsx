@@ -1,64 +1,154 @@
 import React from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import OutlinedInput from '@mui/material/OutlinedInput';
-import InputLabel from '@mui/material/InputLabel';
-import InputAdornment from '@mui/material/InputAdornment';
-import FormControl from '@mui/material/FormControl';
+import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import TextField from '@mui/material/TextField';
+import MenuList from '@mui/material/MenuList';
+import MenuItem from '@mui/material/MenuItem';
+import { styled } from '@mui/material/styles';
+import { useNavigate } from "react-router-dom";
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Grow from '@mui/material/Grow';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
 
 import Header from '../components/Header';
+import { cleanName } from '../utils/cleanName';
 
-const searchButtonColor = 'rgb(219, 55, 76)';
+// TODO breakout if reused
+const SearchButton = styled(IconButton)<IconButtonProps>(({ theme }) => ({
+  color: theme.colors.primary,
+}));
+
+type Drug = {
+  language: string;
+  name: string;
+  cleanName: string;
+  rxcui: string;
+  suppress: string;
+  synonym: string;
+  tty: string;
+  umlscui: string;
+};
+type Response = {
+  drugGroup: {
+    conceptGroup?: {
+      tty: string;
+      conceptProperties?: Drug[]
+    }[]
+  }
+};
+
+const formatDrugs = (response: Response): Drug[] => {
+  const flatDrugs = response.drugGroup.conceptGroup?.reduce<Drug[]>((acc, curr) => {
+    acc.push(...(curr.conceptProperties || []));
+    return acc;
+  }, []) ?? [];
+  const sanitizedDrugs = flatDrugs.map(d => ({ ...d, cleanName: cleanName(d.name) }))
+  const sortedDrugs = sanitizedDrugs.sort((a,b) => a.cleanName > b.cleanName ? 1 : -1);
+  return sortedDrugs;
+}
 
 function Search() {
   const [searchText, setSearchText] = React.useState<string>('');
-  const [drugs, setDrugs] = React.useState<any[]>([]);
+  const [drugs, setDrugs] = React.useState<Drug[]>([]);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [open, setOpen] = React.useState(false);
+
+  const anchorRef = React.useRef<HTMLInputElement>(null);
+
+  const navigate = useNavigate();
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     setSearchText(event.target.value);
   }
 
   const handleSearchClick = async (): Promise<void> => {
+    if (!searchText) { return; }
+
     fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${searchText}`, {
       method: 'GET',
     }).then(response => response.json())
       .then(data => {
-        setDrugs(data);
+        setDrugs(formatDrugs(data));
       });
+
+    setOpen(true);
   };
-  console.log('\n\n');
-  console.log('drugs', drugs);
-  console.log('\n\n');
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleItemClick = (drug: Drug) => {
+    console.log(drug)
+    navigate(`/drugs/${encodeURI(drug.name)}`)
+    handleClose();
+  };
+
+  const handleListKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      setOpen(false);
+    } else if (event.key === 'Escape') {
+      setOpen(false);
+    }
+  }
 
   return (
     <Box>
       <Header />
-      <Box sx={{ display: 'flex', marginTop: '30px', justifyContent: 'center' }}>
-        <FormControl sx={{ width: '90%', m: 1 }}>
-          <InputLabel htmlFor="outlined-adornment-getDrugs">Search by drug name (E.g. Lipitor)</InputLabel>
-          <OutlinedInput
-            fullWidth
-            id="outlined-adornment-getDrugs"
-            type="text"
-            value={searchText}
-            onChange={handleSearchChange}
-            endAdornment={
-              <InputAdornment position="end">
-                <Button
-                  onClick={handleSearchClick}
-                  onMouseDown={handleSearchClick}
-                  endIcon={<SearchRoundedIcon />}
-                  variant="contained"
-                  size="large"
-                >
-                  Find the lowest price
-                </Button>
-              </InputAdornment>
-            }
-          />
-        </FormControl>
+      <Box sx={{ width: '70%', display: 'flex', margin: '30px auto 0', justifyContent: 'center', overflow: 'hidden', maxHeight: '500px' }} ref={anchorRef}>
+        <TextField
+          sx={{ width: '100%' }}
+          onChange={handleSearchChange}
+          onFocus={(e) => setAnchorEl(e.currentTarget)}
+          InputProps={{
+            type: 'search'
+          }}
+        />
+        <SearchButton
+          onClick={handleSearchClick}
+          onMouseDown={handleSearchClick}
+        >
+          <SearchRoundedIcon />
+        </SearchButton>
       </Box>
+      <Popper
+        sx={{ width: '70%', maxHeight: '500px', overflow: 'scroll' }}
+        open={open}
+        anchorEl={anchorRef.current}
+        role={undefined}
+        placement="bottom-start"
+        transition
+        disablePortal
+      >
+        {({ TransitionProps, placement }) => (
+          <Grow
+            {...TransitionProps}
+            style={{
+              transformOrigin:
+                placement === 'bottom-start' ? 'left top' : 'left bottom',
+            }}
+          >
+            <Paper>
+              <ClickAwayListener onClickAway={handleClose}>
+                <MenuList
+                  autoFocusItem={open}
+                  id="composition-menu"
+                  aria-labelledby="composition-button"
+                  onKeyDown={handleListKeyDown}
+                  sx={{ border: '1px solid light-grey' }}
+                >
+                  {drugs.map(d => (
+                    <MenuItem key={d.name} onClick={() => handleItemClick(d)}>{d.cleanName}</MenuItem>
+                  ))}
+                </MenuList>
+              </ClickAwayListener>
+            </Paper>
+          </Grow>
+        )}
+      </Popper>
     </Box>
   );
 }

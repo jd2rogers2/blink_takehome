@@ -1,5 +1,5 @@
 import React from 'react';
-import AppBar from '@mui/material/AppBar';
+import AppBar, { AppBarProps } from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
@@ -11,9 +11,18 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
 import Paper from '@mui/material/Paper';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { styled } from '@mui/material/styles';
+
+import { cleanName } from '../utils/cleanName';
+
+const StyledAppBar = styled(AppBar)<AppBarProps>(({ theme }) => ({
+  backgroundColor: theme.colors.primary,
+}));
 
 const sanitizeDrugName = (drugName: string): string => {
-  return drugName;
+  const decoded = decodeURI(drugName);
+  const cleanedName = cleanName(decoded);
+  return cleanedName;
 };
 
 const getPageTitle = (pathname: string, drugName?: string): string => {
@@ -77,7 +86,7 @@ function Header() {
   }, [open]);
 
   return (
-    <AppBar position="static">
+    <StyledAppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Blink Takehome
@@ -132,7 +141,7 @@ function Header() {
           )}
         </Popper>
       </Toolbar>
-    </AppBar>
+    </StyledAppBar>
   );
 }
 
