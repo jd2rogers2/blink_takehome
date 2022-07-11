@@ -49,10 +49,18 @@ const formatDrugs = (response: Response): Drug[] => {
   return sortedDrugs;
 }
 
+const getDrugs = async (searchText: string): Promise<Drug[]> => {
+  const res = await fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${searchText}`, {
+    method: 'GET',
+  })
+  const data = await res.json();
+  return formatDrugs(data);
+};
+
 function Search() {
   const [searchText, setSearchText] = React.useState<string>('');
   const [drugs, setDrugs] = React.useState<Drug[]>([]);
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [open, setOpen] = React.useState(false);
 
   const anchorRef = React.useRef<HTMLInputElement>(null);
@@ -66,12 +74,24 @@ function Search() {
   const handleSearchClick = async (): Promise<void> => {
     if (!searchText) { return; }
 
-    fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${searchText}`, {
-      method: 'GET',
-    }).then(response => response.json())
-      .then(data => {
-        setDrugs(formatDrugs(data));
-      });
+    const drugs = await getDrugs(searchText);
+
+    if (drugs.length) {
+      setDrugs(drugs);
+    } else {
+      const res = await fetch(`https://rxnav.nlm.nih.gov/REST/spellingsuggestions.json?name=${searchText}`, {
+        method: 'GET',
+      })
+      const data = await res.json();
+      const firstSuggestion = data.suggestionGroup.suggestionList[0]?.suggestion || '';
+
+      if (firstSuggestion) {
+        const suggestedDrugs = await getDrugs(firstSuggestion);
+        setDrugs(suggestedDrugs);
+      } else {
+        // error
+      }
+    }
 
     setOpen(true);
   };
@@ -80,7 +100,7 @@ function Search() {
     setAnchorEl(null);
   };
 
-  const handleItemClick = (drug: Drug) => {
+  const handleDrugClick = (drug: Drug) => {
     console.log(drug)
     navigate(`/drugs/${encodeURI(drug.name)}`)
     handleClose();
@@ -95,6 +115,12 @@ function Search() {
     }
   }
 
+  const handleSearchKey = (event: React.KeyboardEvent): void => {
+    if (event.key === 'Enter') {
+      handleSearchClick();
+    }
+  }
+
   return (
     <Box>
       <Header />
@@ -106,6 +132,7 @@ function Search() {
           InputProps={{
             type: 'search'
           }}
+          onKeyDown={handleSearchKey}
         />
         <SearchButton
           onClick={handleSearchClick}
@@ -141,7 +168,7 @@ function Search() {
                   sx={{ border: '1px solid light-grey' }}
                 >
                   {drugs.map(d => (
-                    <MenuItem key={d.name} onClick={() => handleItemClick(d)}>{d.cleanName}</MenuItem>
+                    <MenuItem key={d.name} onClick={() => handleDrugClick(d)}>{d.cleanName}</MenuItem>
                   ))}
                 </MenuList>
               </ClickAwayListener>
