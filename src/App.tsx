@@ -2,8 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Box from '@mui/material/Box';
 
-import Search from './views/Search';
-import DrugShow from './views/DrugShow';
+import { DrugShow, Search } from './views';
 
 function App() {
   return (

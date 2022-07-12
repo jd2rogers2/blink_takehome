@@ -12,56 +12,22 @@ import Grow from '@mui/material/Grow';
 import Paper from '@mui/material/Paper';
 import Popper from '@mui/material/Popper';
 
-import Header from '../components/Header';
-import { cleanName } from '../utils/cleanName';
+import { Header } from '../components';
+import { getDrugs } from '../utils';
+
+import type { Drug } from '../types';
 
 // TODO breakout if reused
 const SearchButton = styled(IconButton)<IconButtonProps>(({ theme }) => ({
   color: theme.colors.primary,
 }));
 
-type Drug = {
-  language: string;
-  name: string;
-  cleanName: string;
-  rxcui: string;
-  suppress: string;
-  synonym: string;
-  tty: string;
-  umlscui: string;
-};
-type Response = {
-  drugGroup: {
-    conceptGroup?: {
-      tty: string;
-      conceptProperties?: Drug[]
-    }[]
-  }
-};
-
-const formatDrugs = (response: Response): Drug[] => {
-  const flatDrugs = response.drugGroup.conceptGroup?.reduce<Drug[]>((acc, curr) => {
-    acc.push(...(curr.conceptProperties || []));
-    return acc;
-  }, []) ?? [];
-  const sanitizedDrugs = flatDrugs.map(d => ({ ...d, cleanName: cleanName(d.name) }))
-  const sortedDrugs = sanitizedDrugs.sort((a,b) => a.cleanName > b.cleanName ? 1 : -1);
-  return sortedDrugs;
-}
-
-const getDrugs = async (searchText: string): Promise<Drug[]> => {
-  const res = await fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${searchText}`, {
-    method: 'GET',
-  })
-  const data = await res.json();
-  return formatDrugs(data);
-};
-
 function Search() {
   const [searchText, setSearchText] = React.useState<string>('');
   const [drugs, setDrugs] = React.useState<Drug[]>([]);
   const [, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState<boolean>(false);
+  const [noneFound, setNoneFound] = React.useState<boolean>(false);
 
   const anchorRef = React.useRef<HTMLInputElement>(null);
 
@@ -69,6 +35,7 @@ function Search() {
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     setSearchText(event.target.value);
+    setNoneFound(false);
   }
 
   const handleSearchClick = async (): Promise<void> => {
@@ -78,6 +45,7 @@ function Search() {
 
     if (drugs.length) {
       setDrugs(drugs);
+      setOpen(true);
     } else {
       const res = await fetch(`https://rxnav.nlm.nih.gov/REST/spellingsuggestions.json?name=${searchText}`, {
         method: 'GET',
@@ -88,12 +56,13 @@ function Search() {
       if (firstSuggestion) {
         const suggestedDrugs = await getDrugs(firstSuggestion);
         setDrugs(suggestedDrugs);
+        setOpen(true);
       } else {
-        // error
+        setDrugs([]);
+        setNoneFound(true);
+        setOpen(false);
       }
     }
-
-    setOpen(true);
   };
 
   const handleClose = () => {
@@ -101,8 +70,7 @@ function Search() {
   };
 
   const handleDrugClick = (drug: Drug) => {
-    console.log(drug)
-    navigate(`/drugs/${encodeURI(drug.name)}`)
+    navigate(`/drugs/${encodeURIComponent(drug.name)}?rxcui=${drug.rxcui}&searchText=${searchText}`)
     handleClose();
   };
 
@@ -124,25 +92,25 @@ function Search() {
   return (
     <Box>
       <Header />
-      <Box sx={{ width: '70%', display: 'flex', margin: '30px auto 0', justifyContent: 'center', overflow: 'hidden', maxHeight: '500px' }} ref={anchorRef}>
+      <Box sx={{ width: '70%', display: 'flex', margin: '20px auto 0', justifyContent: 'center', overflow: 'hidden', maxHeight: '500px' }} ref={anchorRef}>
         <TextField
-          sx={{ width: '100%' }}
+          sx={{ width: '100%', marginTop: '10px' }}
           onChange={handleSearchChange}
           onFocus={(e) => setAnchorEl(e.currentTarget)}
           InputProps={{
-            type: 'search'
+            type: 'search',
           }}
           onKeyDown={handleSearchKey}
+          label={noneFound ? 'None found' : undefined}
+          error={noneFound}
+          placeholder="Search by drug name (E.g. Lipitor)"
         />
-        <SearchButton
-          onClick={handleSearchClick}
-          onMouseDown={handleSearchClick}
-        >
+        <SearchButton onClick={handleSearchClick}>
           <SearchRoundedIcon />
         </SearchButton>
       </Box>
       <Popper
-        sx={{ width: '70%', maxHeight: '500px', overflow: 'scroll' }}
+        sx={{ width: '70%', maxHeight: '500px', overflow: 'scroll', borderBottom: '1px solid grey', borderRadius: 0 }}
         open={open}
         anchorEl={anchorRef.current}
         role={undefined}
@@ -165,7 +133,6 @@ function Search() {
                   id="composition-menu"
                   aria-labelledby="composition-button"
                   onKeyDown={handleListKeyDown}
-                  sx={{ border: '1px solid light-grey' }}
                 >
                   {drugs.map(d => (
                     <MenuItem key={d.name} onClick={() => handleDrugClick(d)}>{d.cleanName}</MenuItem>

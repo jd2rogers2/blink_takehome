@@ -10,7 +10,7 @@ import MenuList from '@mui/material/MenuList';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
 import Paper from '@mui/material/Paper';
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { styled } from '@mui/material/styles';
 
 import { cleanName } from '../utils/cleanName';
@@ -89,7 +89,7 @@ function Header() {
     <StyledAppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Blink Takehome
+          <Link to="/" style={{ textDecoration: 'none', color: 'white' }}>Blink Takehome</Link>
         </Typography>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           {pageTitle}
